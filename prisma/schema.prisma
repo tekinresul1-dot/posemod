@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String?
+  passwordHash   String
+  credits        Float    @default(0)
+  pendingCredits Float    @default(0)
+  plan           String   @default("free")
+  createdAt      DateTime @default(now())
+  generations    Generation[]
+  transactions   CreditTransaction[]
+}
+
+model Generation {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  jobId       String    @unique
+  type        String
+  status      String    @default("pending")
+  creditCost  Float
+  productName String?
+  prompt      String?
+  negPrompt   String?
+  quality     String    @default("1k")
+  inputUrls   String[]
+  outputUrls  String[]
+  mannequinId         String?
+  errorMsg            String?
+  parentGenerationId  String?
+  createdAt           DateTime  @default(now())
+  completedAt         DateTime?
+}
+
+model Mannequin {
+  id                String   @id @default(cuid())
+  name              String
+  gender            String   @default("")
+  ethnicity         String?
+  previewUrl        String   @default("")
+  userId            String   @default("")
+  prompt            String   @default("")
+  ageRange          String?
+  height            String?
+  size              String?
+  skinTone          String?
+  hairColor         String?
+  hairLength        String?
+  eyeColor          String?
+  customPrompt      String?
+  referencePhotoUrl String?
+  backgroundUrl     String?
+  poseData          Json?
+  createdFrom       String   @default("manual")
+  isSystem          Boolean  @default(false)
+  createdAt         DateTime @default(now())
+}
+
+model CreditTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  amount    Float
+  type      String
+  reference String?
+  createdAt DateTime @default(now())
+}
