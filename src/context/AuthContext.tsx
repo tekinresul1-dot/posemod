@@ -7,7 +7,9 @@ interface AuthUser {
   id: string
   name: string | null
   email: string
+  role: 'USER' | 'ADMIN'
   credits: number
+  pendingCredits: number
 }
 
 interface AuthContextType {
@@ -16,7 +18,7 @@ interface AuthContextType {
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   register: (name: string, email: string, password: string) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
   refreshCredits: () => Promise<void>
 }
 
@@ -35,7 +37,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(storedToken)
       setUser(JSON.parse(storedUser))
     }
-    setLoading(false)
+    fetch('/api/auth/me')
+      .then(async (res) => {
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.user) {
+          setUser(data.user)
+          localStorage.setItem('ps_user', JSON.stringify(data.user))
+        }
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {
@@ -68,7 +79,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/dashboard')
   }, [router])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
     localStorage.removeItem('ps_token')
     localStorage.removeItem('ps_user')
     setToken(null)
@@ -86,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await res.json()
       setUser((prev) => {
         if (!prev) return prev
-        const updated = { ...prev, credits: data.credits }
+        const updated = { ...prev, credits: data.credits, pendingCredits: data.pendingCredits }
         localStorage.setItem('ps_user', JSON.stringify(updated))
         return updated
       })

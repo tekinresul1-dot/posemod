@@ -32,7 +32,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-2 mb-8">
           <Camera className="text-purple-500" size={28} />
-          <span className="text-xl font-bold text-white">Product Studio</span>
+          <span className="text-xl font-bold text-white">Posemod</span>
         </div>
 
         <div className="bg-[#111111] rounded-2xl p-8 border border-white/10">

@@ -1,9 +1,8 @@
 import fs from 'fs'
 import type { Job } from 'bullmq'
-import { promises as fsp } from 'fs'
 import { prisma } from '@/lib/prisma'
 import { generateMannequinPose } from '@/lib/nanoBanana'
-import { saveImage } from '@/lib/storage'
+import { loadImageAsBase64, saveImage } from '@/lib/storage'
 import { confirmUsage, refundCredits } from '@/lib/credits'
 import { MANNEQUIN_SET_POSES } from '@/lib/prompts'
 
@@ -27,22 +26,16 @@ interface MannequinSetJobData {
 }
 
 async function loadFileAsBase64(filePath: string | null): Promise<string | null> {
-  if (!filePath) return null
-  try {
-    const buf = await fsp.readFile(filePath)
-    return buf.toString('base64')
-  } catch {
-    return null
-  }
+  return loadImageAsBase64(filePath)
 }
 
 async function loadReferenceImages(filePaths: string[]): Promise<string[]> {
   const results: string[] = []
   for (const fp of filePaths) {
-    try {
-      const buf = await fsp.readFile(fp)
-      results.push(buf.toString('base64'))
-    } catch {
+    const base64 = await loadFileAsBase64(fp)
+    if (base64) {
+      results.push(base64)
+    } else {
       wlog(`Could not read reference image: ${fp}`)
     }
   }

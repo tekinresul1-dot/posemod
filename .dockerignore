@@ -1,0 +1,10 @@
+.git
+.next
+node_modules
+npm-debug.log
+.env
+.env.*
+.dev-data
+public/generations
+coverage
+dist-worker

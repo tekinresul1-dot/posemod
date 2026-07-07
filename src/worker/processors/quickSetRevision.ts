@@ -1,11 +1,9 @@
 import fs from 'fs'
-import fsp from 'fs/promises'
 import type { Job } from 'bullmq'
-import path from 'path'
 import { prisma } from '@/lib/prisma'
 import { generateProductPose } from '@/lib/nanoBanana'
 import { generateImages } from '@/lib/imagen'
-import { saveImage } from '@/lib/storage'
+import { loadImageAsBase64, saveImage } from '@/lib/storage'
 import { confirmUsage, refundCredits } from '@/lib/credits'
 import {
   GLOBAL_NEGATIVE_PROMPT,
@@ -54,27 +52,10 @@ async function markGeneration(jobId: string, data: Record<string, unknown>) {
 }
 
 async function fetchImageAsBase64(url: string): Promise<string | null> {
-  // Try reading from local disk first (faster, avoids network for local files)
-  if (url.startsWith('/generations/')) {
-    try {
-      const filePath = path.join(process.cwd(), 'public', url)
-      const buf = await fsp.readFile(filePath)
-      return buf.toString('base64')
-    } catch {
-      // fall through to HTTP fetch
-    }
+  if (url.startsWith('/')) {
+    return loadImageAsBase64(`${process.cwd()}/public${url}`)
   }
-
-  try {
-    const base = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'
-    const fullUrl = url.startsWith('http') ? url : `${base}${url}`
-    const res = await fetch(fullUrl)
-    if (!res.ok) return null
-    const buf = Buffer.from(await res.arrayBuffer())
-    return buf.toString('base64')
-  } catch {
-    return null
-  }
+  return loadImageAsBase64(url)
 }
 
 export async function processQuickSetRevision(job: Job<QuickSetRevisionJobData>) {

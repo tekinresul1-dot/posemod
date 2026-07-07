@@ -1,6 +1,4 @@
 import { NextRequest } from 'next/server'
-import { promises as fs } from 'fs'
-import path from 'path'
 import { getServerSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { CREDIT_COSTS, reserveCredits } from '@/lib/credits'
@@ -8,20 +6,26 @@ import { generationQueue } from '@/lib/queue'
 import { isDatabaseUnavailable } from '@/lib/database'
 import { createDevGeneration, getDevMannequins } from '@/lib/devStore'
 import { getErrorStatus, getPublicErrorMessage } from '@/lib/serverError'
+import { parseDataUri, validateText } from '@/lib/validation'
+import { saveInputImage } from '@/lib/storage'
+import { checkRateLimit, clientIp } from '@/lib/rateLimit'
 
-async function writeDataUriToDisk(jobId: string, dataUri: string, filename: string): Promise<string | null> {
-  const match = dataUri.match(/^data:([^;]+);base64,(.+)$/)
-  if (!match) return null
-  const dir = path.join(process.cwd(), 'public', 'generations', jobId)
-  await fs.mkdir(dir, { recursive: true })
-  const filePath = path.join(dir, filename)
-  await fs.writeFile(filePath, Buffer.from(match[2], 'base64'))
-  return filePath
+async function persistDataUri(jobId: string, dataUri: string, fallbackName: string): Promise<string | null> {
+  const parsed = parseDataUri(dataUri)
+  if (!parsed) return null
+  const filename = `${fallbackName}.${parsed.ext}`
+  return saveInputImage(parsed.buffer, jobId, filename, parsed.mimeType)
 }
 
 export async function POST(request: NextRequest) {
   const user = await getServerSession(request)
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  const limit = await checkRateLimit({
+    key: `generation:${user.id}:${clientIp(request)}`,
+    limit: 30,
+    windowSeconds: 60 * 60,
+  })
+  if (!limit.ok) return Response.json({ error: 'Çok fazla üretim denemesi. Lütfen daha sonra tekrar deneyin.' }, { status: 429 })
 
   try {
     const body = await request.json() as {
@@ -63,6 +67,10 @@ export async function POST(request: NextRequest) {
       sourceGenerationId,
     } = body
 
+    if (!type || !validateText(productName || prompt || revisionPrompt || 'generation', 2000)) {
+      return Response.json({ error: 'Üretim açıklaması gerekli' }, { status: 400 })
+    }
+
     if (type === 'mannequin') {
       if (!mannequinId) return Response.json({ error: 'Manken gerekli' }, { status: 400 })
       if (!productImageBase64) return Response.json({ error: 'Ürün görseli gerekli' }, { status: 400 })
@@ -91,23 +99,23 @@ export async function POST(request: NextRequest) {
 
       if (process.env.SKIP_CREDIT_CHECK !== 'true') {
         const reserved = await reserveCredits(user.id, creditCost)
-        if (!reserved) return Response.json({ error: 'Yetersiz kredi' }, { status: 402 })
+        if (!reserved) return Response.json({ error: 'Yetersiz kredi. Devam etmek için kredi satın alın.' }, { status: 402 })
       }
 
       const jobId = crypto.randomUUID()
 
-      const productFilePath = await writeDataUriToDisk(jobId, productImageBase64, 'product-1.jpg')
+      const productFilePath = await persistDataUri(jobId, productImageBase64, 'product-1')
       const backgroundFilePath = backgroundImageBase64
-        ? await writeDataUriToDisk(jobId, backgroundImageBase64, 'background.jpg')
+        ? await persistDataUri(jobId, backgroundImageBase64, 'background')
         : null
       const mannequinReferenceFilePath =
         mannequin.referencePhotoUrl && mannequin.referencePhotoUrl.startsWith('data:')
-          ? await writeDataUriToDisk(jobId, mannequin.referencePhotoUrl, 'mannequin-ref.jpg')
+          ? await persistDataUri(jobId, mannequin.referencePhotoUrl, 'mannequin-ref')
           : null
 
       const savedInputUrls: string[] = []
-      if (productFilePath) savedInputUrls.push(`/generations/${jobId}/product-1.jpg`)
-      if (backgroundFilePath) savedInputUrls.push(`/generations/${jobId}/background.jpg`)
+      if (productFilePath) savedInputUrls.push(productFilePath.startsWith('/') ? `/generations/${jobId}/product-1.jpg` : productFilePath)
+      if (backgroundFilePath) savedInputUrls.push(backgroundFilePath.startsWith('/') ? `/generations/${jobId}/background.jpg` : backgroundFilePath)
 
       const generationData = {
         userId: user.id,
@@ -152,6 +160,12 @@ export async function POST(request: NextRequest) {
         hasBackground: Boolean(backgroundFilePath),
         creditCost,
         language,
+      }, {
+        jobId,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: { count: 1000 },
+        removeOnFail: { count: 1000 },
       })
 
       return Response.json({ jobId })
@@ -167,7 +181,7 @@ export async function POST(request: NextRequest) {
 
       if (process.env.SKIP_CREDIT_CHECK !== 'true') {
         const reserved = await reserveCredits(user.id, creditCost)
-        if (!reserved) return Response.json({ error: 'Yetersiz kredi' }, { status: 402 })
+        if (!reserved) return Response.json({ error: 'Yetersiz kredi. Devam etmek için kredi satın alın.' }, { status: 402 })
       }
 
       const jobId = crypto.randomUUID()
@@ -213,6 +227,12 @@ export async function POST(request: NextRequest) {
         height: height ?? null,
         aspectRatio: aspectRatio ?? null,
         language,
+      }, {
+        jobId,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: { count: 1000 },
+        removeOnFail: { count: 1000 },
       })
 
       return Response.json({ jobId })
@@ -234,7 +254,7 @@ export async function POST(request: NextRequest) {
     if (process.env.SKIP_CREDIT_CHECK !== 'true') {
       const reserved = await reserveCredits(user.id, creditCost)
       if (!reserved) {
-        return Response.json({ error: 'Yetersiz kredi' }, { status: 402 })
+        return Response.json({ error: 'Yetersiz kredi. Devam etmek için kredi satın alın.' }, { status: 402 })
       }
     }
 
@@ -244,20 +264,21 @@ export async function POST(request: NextRequest) {
     const savedInputUrls: string[] = []
 
     if (inputUrls.length > 0) {
-      const dir = path.join(process.cwd(), 'public', 'generations', jobId)
-      await fs.mkdir(dir, { recursive: true })
-
       for (let i = 0; i < inputUrls.length; i++) {
         const dataUri = inputUrls[i]
         if (!dataUri) continue
-        const match = dataUri.match(/^data:([^;]+);base64,(.+)$/)
-        if (!match) continue
-        const ext = match[1].split('/')[1]?.replace(/\+.*/, '') || 'jpg'
-        const filename = `input-${i + 1}.${ext}`
-        const filePath = path.join(dir, filename)
-        await fs.writeFile(filePath, Buffer.from(match[2], 'base64'))
-        referenceFilePaths.push(filePath)
-        savedInputUrls.push(`/generations/${jobId}/${filename}`)
+        const parsed = parseDataUri(dataUri)
+        if (!parsed) {
+          return Response.json({ error: 'Sadece jpg, png veya webp ve en fazla 10MB görsel yükleyin' }, { status: 400 })
+        }
+        const location = await saveInputImage(
+          parsed.buffer,
+          jobId,
+          `input-${i + 1}.${parsed.ext}`,
+          parsed.mimeType
+        )
+        referenceFilePaths.push(location)
+        savedInputUrls.push(location.startsWith('/') ? `/generations/${jobId}/input-${i + 1}.${parsed.ext}` : location)
       }
     }
 
@@ -302,6 +323,12 @@ export async function POST(request: NextRequest) {
       height: height ?? null,
       aspectRatio: aspectRatio ?? null,
       language,
+    }, {
+      jobId,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 5000 },
+      removeOnComplete: { count: 1000 },
+      removeOnFail: { count: 1000 },
     })
 
     return Response.json({ jobId })

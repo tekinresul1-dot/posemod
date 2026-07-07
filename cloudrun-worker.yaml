@@ -1,0 +1,29 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: posemod-worker
+  annotations:
+    run.googleapis.com/ingress: internal
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "2"
+    spec:
+      serviceAccountName: posemod-runtime@YOUR_GCP_PROJECT_ID.iam.gserviceaccount.com
+      containerConcurrency: 1
+      timeoutSeconds: 3600
+      containers:
+        - image: us-central1-docker.pkg.dev/YOUR_GCP_PROJECT_ID/posemod/posemod:latest
+          command: ["npm"]
+          args: ["run", "worker"]
+          resources:
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: NEXT_PUBLIC_APP_URL
+              value: https://posemod.com

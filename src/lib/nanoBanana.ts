@@ -2,9 +2,8 @@ import fs from 'fs'
 import { GoogleAuth } from 'google-auth-library'
 import { generateImages as imagenFallback } from './imagen'
 import type { GenerateParams } from './imagen'
+import { requireProductionEnv } from './env'
 
-const PROJECT = process.env.GOOGLE_PROJECT_ID ?? 'pixmarj'
-const LOCATION = process.env.GOOGLE_LOCATION ?? 'us-central1'
 const LOG_FILE = '/tmp/worker.log'
 
 const MODELS = [
@@ -14,7 +13,9 @@ const MODELS = [
 ]
 
 function modelEndpoint(modelId: string): string {
-  return `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT}/locations/${LOCATION}/publishers/google/models/${modelId}:generateContent`
+  const project = requireProductionEnv('GOOGLE_PROJECT_ID') ?? process.env.GOOGLE_PROJECT_ID ?? 'local-project'
+  const location = requireProductionEnv('GOOGLE_LOCATION') ?? process.env.GOOGLE_LOCATION ?? 'us-central1'
+  return `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${modelId}:generateContent`
 }
 
 export function wlog(msg: string) {

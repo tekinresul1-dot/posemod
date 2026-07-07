@@ -1,10 +1,9 @@
 import fs from 'fs'
 import type { Job } from 'bullmq'
-import { promises as fsp } from 'fs'
 import { prisma } from '@/lib/prisma'
 import { generateProductPose } from '@/lib/nanoBanana'
 import { generateImages } from '@/lib/imagen'
-import { saveImage } from '@/lib/storage'
+import { loadImageAsBase64, saveImage } from '@/lib/storage'
 import { confirmUsage, refundCredits } from '@/lib/credits'
 import { GLOBAL_NEGATIVE_PROMPT, NEGATIVE_REALISM, HUMAN_REALISM_SUFFIX_EN, HUMAN_REALISM_SUFFIX_TR, getCompositionRule } from '@/lib/prompts'
 import sharp from 'sharp'
@@ -36,10 +35,10 @@ interface QuickSetJobData {
 async function loadReferenceImages(filePaths: string[]): Promise<string[]> {
   const results: string[] = []
   for (const fp of filePaths) {
-    try {
-      const buf = await fsp.readFile(fp)
-      results.push(buf.toString('base64'))
-    } catch {
+    const base64 = await loadImageAsBase64(fp)
+    if (base64) {
+      results.push(base64)
+    } else {
       wlog(`Could not read reference image: ${fp}`)
     }
   }

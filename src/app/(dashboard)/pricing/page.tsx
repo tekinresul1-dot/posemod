@@ -1,15 +1,33 @@
 'use client'
 
+import { useState } from 'react'
 import { Check, Zap } from 'lucide-react'
 import { useLanguage } from '@/context/LanguageContext'
-
-const PLAN_PRICES = ['₺99', '₺249', '₺699']
-const PLAN_CREDITS = [50, 150, 500]
-const PLAN_POPULAR = [false, true, false]
-const PLAN_KEYS = ['starter', 'standard', 'pro'] as const
+import { CREDIT_PACKAGES } from '@/lib/creditPackages'
 
 export default function PricingPage() {
   const { t } = useLanguage()
+  const [loadingPackage, setLoadingPackage] = useState<string | null>(null)
+  const [error, setError] = useState('')
+
+  async function buyCredits(packageId: string) {
+    setError('')
+    setLoadingPackage(packageId)
+    try {
+      const res = await fetch('/api/payments/paytr/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packageId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Ödeme başlatılamadı')
+      window.location.href = data.iframeUrl
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ödeme başlatılamadı')
+    } finally {
+      setLoadingPackage(null)
+    }
+  }
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -18,14 +36,19 @@ export default function PricingPage() {
         <p className="text-gray-400">{t.pricing.subtitle}</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        {PLAN_KEYS.map((key, i) => {
-          const plan = t.pricing.plans[key]
-          const popular = PLAN_POPULAR[i]!
+      {error && (
+        <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-300 text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {CREDIT_PACKAGES.map((plan, i) => {
+          const popular = i === 1
           return (
             <div
-              key={key}
-              className={`bg-[#111111] rounded-2xl p-6 border relative ${
+              key={plan.id}
+              className={`bg-[#111111] rounded-lg p-6 border relative ${
                 popular ? 'border-purple-500' : 'border-white/10'
               }`}
             >
@@ -40,16 +63,16 @@ export default function PricingPage() {
               <div className="mb-6">
                 <h2 className="text-lg font-bold text-white mb-1">{plan.name}</h2>
                 <div className="flex items-end gap-1 mt-3">
-                  <span className="text-3xl font-bold text-white">{PLAN_PRICES[i]}</span>
+                  <span className="text-3xl font-bold text-white">₺{plan.amountTRY}</span>
                 </div>
                 <div className="flex items-center gap-1 mt-2">
                   <Zap size={14} className="text-yellow-400" />
-                  <span className="text-yellow-400 text-sm font-medium">{PLAN_CREDITS[i]} {t.common.credits}</span>
+                  <span className="text-yellow-400 text-sm font-medium">{plan.credits} {t.common.credits}</span>
                 </div>
               </div>
 
               <ul className="space-y-3 mb-6">
-                {plan.features.map((f) => (
+                {[plan.description, 'PayTR güvenli ödeme', 'Krediler ödeme onayında yüklenir'].map((f) => (
                   <li key={f} className="flex items-center gap-2 text-sm text-gray-400">
                     <Check size={14} className="text-green-400 flex-shrink-0" />
                     {f}
@@ -58,14 +81,15 @@ export default function PricingPage() {
               </ul>
 
               <button
-                disabled
+                onClick={() => buyCredits(plan.id)}
+                disabled={loadingPackage === plan.id}
                 className={`w-full py-2.5 rounded-lg text-sm font-medium transition ${
                   popular
-                    ? 'bg-purple-600/50 text-purple-300 cursor-not-allowed'
-                    : 'bg-white/5 text-gray-500 cursor-not-allowed'
+                    ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                    : 'bg-white/10 hover:bg-white/15 text-white'
                 }`}
               >
-                {t.pricing.comingSoon}
+                {loadingPackage === plan.id ? 'Yönlendiriliyor...' : 'Satın al'}
               </button>
             </div>
           )

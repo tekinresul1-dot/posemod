@@ -1,7 +1,6 @@
 import { GoogleAuth } from 'google-auth-library'
+import { requireProductionEnv } from './env'
 
-const PROJECT = process.env.GOOGLE_PROJECT_ID ?? 'pixmarj'
-const LOCATION = process.env.GOOGLE_LOCATION ?? 'us-central1'
 const GENERATE_MODEL = 'imagen-4.0-generate-001'
 const CUSTOMIZATION_MODEL = 'imagen-3.0-capability-001'
 
@@ -28,9 +27,11 @@ const BASE_DELAYS = [1000, 2500, 5000]
 const RATE_LIMIT_DELAY_MS = 10_000
 
 export async function generateImages(params: GenerateParams): Promise<Buffer[]> {
+  const project = requireProductionEnv('GOOGLE_PROJECT_ID') ?? process.env.GOOGLE_PROJECT_ID ?? 'local-project'
+  const location = requireProductionEnv('GOOGLE_LOCATION') ?? process.env.GOOGLE_LOCATION ?? 'us-central1'
   const hasAnyRef = (params.referenceImages?.length ?? 0) + (params.personImages?.length ?? 0) > 0
   const model = hasAnyRef ? CUSTOMIZATION_MODEL : GENERATE_MODEL
-  const endpoint = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT}/locations/${LOCATION}/publishers/google/models/${model}:predict`
+  const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:predict`
 
   let lastError: Error | null = null
 

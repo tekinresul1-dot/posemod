@@ -7,8 +7,8 @@ import { LanguageProvider } from '@/context/LanguageContext'
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
 
 export const metadata: Metadata = {
-  title: 'Product Studio — AI Görsel Üretim',
-  description: 'Trendyol satıcıları için profesyonel ürün görseli üretim platformu',
+  title: 'Posemod — AI Ürün Görseli Üretim Platformu',
+  description: 'E-ticaret satıcıları için AI destekli ürün görseli üretim platformu',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
