@@ -1,9 +1,8 @@
 import fsSync from 'fs'
 import type { Job } from 'bullmq'
-import { promises as fs } from 'fs'
 import { prisma } from '@/lib/prisma'
 import { generateMannequinPose } from '@/lib/nanoBanana'
-import { saveImage } from '@/lib/storage'
+import { loadImageAsBase64, saveImage } from '@/lib/storage'
 import { confirmUsage, refundCredits } from '@/lib/credits'
 import { isDatabaseUnavailable } from '@/lib/database'
 import { createDevGeneration, updateDevGeneration } from '@/lib/devStore'
@@ -53,13 +52,7 @@ const DEFAULT_POSE_DATA: Record<string, string> = {
 }
 
 async function loadFileAsBase64(filePath: string | null): Promise<string | null> {
-  if (!filePath) return null
-  try {
-    const buf = await fs.readFile(filePath)
-    return buf.toString('base64')
-  } catch {
-    return null
-  }
+  return loadImageAsBase64(filePath)
 }
 
 interface ProductAnalysis {

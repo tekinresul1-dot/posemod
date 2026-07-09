@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useLanguage } from '@/context/LanguageContext'
-import { Camera, Zap, Sparkles, Clock, Users, CreditCard, Settings, LogOut } from 'lucide-react'
+import { Camera, Zap, Sparkles, Clock, Users, CreditCard, Settings, LogOut, Shield } from 'lucide-react'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, token, loading, logout, refreshCredits } = useAuth()
@@ -20,6 +20,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { label: t.nav.mannequins, href: '/mannequins', icon: Users },
     { label: t.nav.pricing, href: '/pricing', icon: CreditCard },
     { label: t.nav.settings, href: '/settings', icon: Settings },
+    ...(user?.role === 'ADMIN' ? [{ label: 'Admin', href: '/admin', icon: Shield }] : []),
   ]
 
   useEffect(() => {
@@ -54,7 +55,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="p-6 border-b border-white/5">
           <div className="flex items-center gap-2">
             <Camera className="text-purple-500" size={22} />
-            <span className="font-bold text-white text-lg">Product Studio</span>
+            <span className="font-bold text-white text-lg">Posemod</span>
           </div>
         </div>
 

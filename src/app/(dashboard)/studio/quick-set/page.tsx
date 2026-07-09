@@ -435,7 +435,7 @@ export default function QuickSetPage() {
                       </button>
                       <a
                         href={activeItem.url}
-                        download="product-studio.jpg"
+                        download="posemod.jpg"
                         className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-white/6 hover:bg-white/10 text-gray-300 hover:text-white transition-colors h-7"
                       >
                         <Download size={10} />
@@ -574,7 +574,7 @@ export default function QuickSetPage() {
         onDownload={lightboxImage ? () => {
           const a = document.createElement('a')
           a.href = lightboxImage
-          a.download = 'product-studio.jpg'
+          a.download = 'posemod.jpg'
           a.click()
         } : undefined}
         onPrev={lightboxIndex !== null && lightboxIndex > 0 ? () => {

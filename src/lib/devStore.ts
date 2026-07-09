@@ -103,6 +103,7 @@ export async function createDevUser(data: {
     email: data.email,
     name: data.name,
     passwordHash: data.passwordHash,
+    role: 'USER',
     credits: data.credits ?? 3,
     pendingCredits: 0,
     plan: 'free',
